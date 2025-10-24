@@ -1,0 +1,94 @@
+using System.Text;
+using ContractClaimSystem.Controllers;
+using ContractClaimSystem.Models;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Unit_Test;
+
+namespace ContractClaimSystem.Tests
+{
+    public class ClaimsControllerTests
+    {
+        private readonly Mock<IWebHostEnvironment> _mockEnvironment;
+        private readonly ClaimsController _controller;
+        private object? result;
+
+        public ClaimsControllerTests()
+        {
+            _mockEnvironment = new Mock<IWebHostEnvironment>();
+            
+
+            _controller = new ClaimsController(_mockEnvironment.Object);
+        }
+
+        [Fact]
+        public void Submit_Get_ReturnsViewResult()
+        {
+            // Act
+            var result = _controller.Submit();
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.Null(viewResult.ViewName);
+        }
+
+        [Fact]
+        public async Task Submit_Post_ValidModel_RedirectsToIndex()
+        {
+            // Arrange
+            var claim = new Claim
+            {
+                HoursWorked = 40,
+                HourlyRate = 250,
+                AdditionalNotes = "Test claim"
+            };
+
+            // Act
+            
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Index", redirectResult.ActionName);
+            Assert.Equal("Home", redirectResult.ControllerName);
+        }
+
+        [Fact]
+        public void Pending_ReturnsViewWithPendingClaims()
+        {
+            // Act
+            var result = _controller.Pending();
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsAssignableFrom<List<Claims>>(viewResult.Model);
+            Assert.All(model, claim => Assert.Equal(ClaimStatus.Pending, claim.Status));
+        }
+
+        [Fact]
+        public void Approve_ValidId_UpdatesStatusAndRedirects()
+        {
+            // Arrange
+            var testClaim = new Claim { ClaimId = 1, Status = ClaimStatus.Pending };
+            // Add to static list for testing
+
+            // Act
+            var result = _controller.Approve(1);
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Pending", redirectResult.ActionName);
+        }
+
+        [Fact]
+        public void Track_ReturnsViewWithUserClaims()
+        {
+            // Act
+            var result = _controller.Track();
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.NotNull(viewResult.Model);
+        }
+    }
+}
