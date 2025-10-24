@@ -1,0 +1,109 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Hosting;
+using ContractClaimSystem.Models;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace ContractClaimSystem.Controllers
+{
+    public class ClaimsController : Controller
+    {
+        private static List<Claims> _claims = new List<Claims>();
+        private readonly IWebHostEnvironment _environment;
+
+        public ClaimsController(IWebHostEnvironment environment)
+        {
+            _environment = environment;
+        }
+
+        // Lecturer: Submit claim form
+        public IActionResult Submit(Claim claim)
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Submit(Claims claim)
+        {
+            if (ModelState.IsValid)
+            {
+                claim.ClaimId = _claims.Count + 1;
+                claim.LecturerId = "LEC001"; // Simulated lecturer ID
+                claim.LecturerName = "Dr. John Smith"; // Simulated lecturer name
+                claim.Status = ClaimStatus.Pending;
+
+                // Handle file upload
+                if (claim.SupportingDocument != null && claim.SupportingDocument.Length > 0)
+                {
+                    var uploadsFolder = Path.Combine(_environment.WebRootPath, "documents");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    var fileName = Guid.NewGuid().ToString() + Path.GetExtension(claim.SupportingDocument.FileName);
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await claim.SupportingDocument.CopyToAsync(stream);
+                    }
+
+                    claim.DocumentPath = fileName;
+                }
+
+                _claims.Add(claim);
+                TempData["SuccessMessage"] = "Claim submitted successfully!";
+                return RedirectToAction("Index", "Home");
+            }
+
+            return View(claim);
+        }
+
+        // Coordinator/Manager: View pending claims
+        public IActionResult Pending()
+        {
+            var pendingClaims = _claims.Where(c => c.Status == ClaimStatus.Pending).ToList();
+            return View(pendingClaims);
+        }
+
+        [HttpPost]
+        public IActionResult Approve(int id)
+        {
+            var claim = _claims.FirstOrDefault(c => c.ClaimId == id);
+            if (claim != null)
+            {
+                claim.Status = ClaimStatus.Approved;
+                claim.ApprovedDate = DateTime.Now;
+                claim.ApprovedBy = User.Identity.Name;
+                TempData["SuccessMessage"] = "Claim approved successfully!";
+            }
+            return RedirectToAction("Pending");
+        }
+
+        [HttpPost]
+        public IActionResult Reject(int id)
+        {
+            var claim = _claims.FirstOrDefault(c => c.ClaimId == id);
+            if (claim != null)
+            {
+                claim.Status = ClaimStatus.Rejected;
+                claim.ApprovedDate = DateTime.Now;
+                claim.ApprovedBy = User.Identity.Name;
+                TempData["SuccessMessage"] = "Claim rejected!";
+            }
+            return RedirectToAction("Pending");
+        }
+
+        // Lecturer: Track claims
+        public IActionResult Track()
+        {
+            var userClaims = _claims.Where(c => c.LecturerId == "LEC001").ToList();
+            return View(userClaims);
+        }
+
+        public object Submit()
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
